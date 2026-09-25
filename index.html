@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -259,28 +259,123 @@
             flex-wrap: wrap;
             align-items: center;
         }
+        /* 答题计时器样式 */
+        .timer-wrap{
+            margin-top:20px;
+            text-align:center;
+        }
+        .timer-num{
+            font-size:60px;
+            font-weight:bold;
+            color:#2563eb;
+        }
+        .timer-num.warn{
+            color:#dc2626;
+        }
+        .timer-btn-group{
+            margin-top:10px;
+            display:flex;
+            gap:10px;
+            justify-content:center;
+            flex-wrap:wrap;
+        }
+        .timer-btn{
+            padding:10px 18px;
+            font-size:16px;
+        }
+        input:disabled{
+            cursor:not-allowed;
+        }
+
+        /* =====自定义弹窗样式 淡入淡出动画===== */
+        .modal-overlay{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,0.45);
+            z-index:999;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            opacity:0;
+            pointer-events:none;
+            transition:opacity 0.25s ease;
+        }
+        .modal-overlay.show{
+            opacity:1;
+            pointer-events:auto;
+        }
+        .modal-box{
+            background:#fff;
+            min-width:300px;
+            max-width:90%;
+            border-radius:16px;
+            padding:24px;
+            box-shadow:0 10px 40px rgba(0,0,0,0.18);
+            transform:scale(0.92);
+            transition:transform 0.25s ease;
+        }
+        .modal-overlay.show .modal-box{
+            transform:scale(1);
+        }
+        .modal-text{
+            font-size:18px;
+            color:#1e293b;
+            text-align:center;
+            margin-bottom:20px;
+            line-height:1.6;
+        }
+        .modal-btn-wrap{
+            text-align:center;
+        }
+        .modal-confirm-btn{
+            padding:10px 28px;
+            background:#2563eb;
+            color:#fff;
+            border:none;
+            border-radius:10px;
+            font-size:17px;
+            cursor:pointer;
+        }
+        .modal-confirm-btn:hover{
+            background:#1d4ed8;
+        }
     </style>
 </head>
 <body>
 <div class="container">
     <h1>随机点名</h1>
-
     <div class="settings-icon" id="settingsIcon" onclick="toggleSettings()">⚙</div>
-
     <div class="settings-panel" id="settingsPanel">
         <div class="settings-title">抽取时长设置</div>
-        <input type="range" class="duration-slider" id="durationSlider" min="0.5" max="5" step="0.5" value="0.5" oninput="updateDuration()">
+        <input type="range" class="duration-slider" id="durationSlider" min="0.5" max="10" step="0.5" value="0.5" oninput="updateDuration()">
         <div class="duration-value" id="durationValue">0.5 秒</div>
+        <div class="settings-title" style="margin-top:16px">计时器时间设置</div>
+        <input type="range" class="duration-slider" id="timerSlider" min="10" max="600" step="5" value="30" oninput="updateTimerSetting()">
+        <div class="duration-value" id="timerValue">30 秒</div>
         <div class="setting-row">
-            <input type="checkbox" id="filterStudentCheck" onchange="toggleFilterStudent()">
+            <input type="checkbox" id="autoStartTimerCheck" onchange="toggleAutoStartTimer()">
+            <label for="autoStartTimerCheck">抽取完成后启动计时</label>
+        </div>
+        <div class="setting-row">
+            <input type="checkbox" id="hideTimerCheck" onchange="toggleHideTimer()" checked>
+            <label for="hideTimerCheck">隐藏计时器</label>
+        </div>
+        <div class="setting-row">
+            <input type="checkbox" id="filterStudentCheck" disabled checked>
             <label for="filterStudentCheck">过滤白抽人员</label>
         </div>
     </div>
-
     <div class="result-box" id="resultBox">
         <span class="placeholder-text">点击抽取开始点名</span>
     </div>
-
+    <!-- 答题计时器区域 -->
+    <div class="timer-wrap" id="timerWrap">
+        <div class="timer-num" id="timerDisplay">--</div>
+        <div class="timer-btn-group">
+            <button class="timer-btn" id="timerMainBtn" onclick="toggleTimer()">开始计时</button>
+            <button class="timer-btn" onclick="resetTimer()">重置计时</button>
+        </div>
+    </div>
     <div class="btn-group">
         <button class="btn-draw" id="drawBtn" onclick="startDraw()">抽取学生</button>
         <label class="checkbox-wrap">
@@ -290,12 +385,22 @@
         <button class="btn-clear-history hide" id="clearBtn" onclick="clearHistory()">清除抽取记录</button>
         <button class="btn-toggle-list" onclick="toggleStudentList()">显示名单</button>
     </div>
-
     <div class="student-list-wrap" id="studentListWrap">
         <div class="list-title">学生名单：</div>
         <div class="student-list" id="listBox"></div>
     </div>
 </div>
+
+<!-- 自定义弹窗DOM -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal-box">
+        <div class="modal-text" id="modalText"></div>
+        <div class="modal-btn-wrap">
+            <button class="modal-confirm-btn" onclick="closeModal()">确定</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const defaultStudents = [
         "霍璟熠","周潇愉","夏晨峰","葛子妍","王伟祺","周子皓","张嘉嘉","陈文谦","胡奕","曹一翔",
@@ -305,17 +410,47 @@
         "朱涵月","唐帅","吴恩泽","周好","周佳琪","陈轩阳","刘龙翔","彭滢颖","陈志羽","周文博",
         "甄家旺","姚翧","贾思远","田振利","曹海熙"
     ];
-    // 需要过滤黑名单（已修正：刘龙祥 → 刘龙翔）
-    const filterNameList = ["甄家旺", "周文博", "陈轩阳", "陈志羽", "许雨泽", "周好", "韩朝光", "刘龙翔", "王宇航", "吴恩泽"];
-
+    const filterNameList = ["甄家旺", "周文博", "陈轩阳", "陈志羽", "许雨泽", "周好", "韩朝光", "刘龙翔", "王宇航","吴恩泽",
+        "刘子涵","刘子杰"];
     let studentList = [];
     let pickedSet = new Set();
     let isNoRepeat = false;
-    let isFilterStudent = true; // 默认打开过滤
+    const isFilterStudent = true; //固定开启，不可修改
     let rollingTimer = null;
     let autoStopTimer = null;
     let isRolling = false;
     let autoStopDelay = 500;
+    // 答题计时变量
+    let answerTotalSecond = 30;
+    let answerLeftSecond = 0;
+    let timerInterval = null;
+    let timerRunning = false;
+    let autoStartTimer = false;
+    let hideTimer = true; // 默认开启：隐藏计时器
+
+    // =========自定义弹窗封装 替代alert=========
+    function showModal(msg){
+        document.getElementById('modalText').innerText = msg;
+        document.getElementById('modalOverlay').classList.add('show');
+    }
+    function closeModal(){
+        document.getElementById('modalOverlay').classList.remove('show');
+    }
+
+    // 更新抽取按钮可用状态：不重复抽取模式，全部抽完则灰显按钮
+    function updateDrawBtnState(){
+        const drawBtn = document.getElementById('drawBtn');
+        if(isNoRepeat){
+            const available = studentList.filter(name => !pickedSet.has(name));
+            if(available.length === 0){
+                drawBtn.disabled = true;
+            }else{
+                drawBtn.disabled = false;
+            }
+        }else{
+            drawBtn.disabled = false;
+        }
+    }
 
     // 保存设置
     function saveSettings(){
@@ -323,12 +458,13 @@
             const settingData = {
                 autoStopDelay: autoStopDelay,
                 isNoRepeat: isNoRepeat,
-                isFilterStudent: isFilterStudent
+                answerTotalSecond: answerTotalSecond,
+                autoStartTimer:autoStartTimer,
+                hideTimer: hideTimer
             };
             localStorage.setItem("randomCallSettings", JSON.stringify(settingData));
-            console.log("✅设置已保存", settingData);
         } catch (e) {
-            console.warn("❌localStorage保存失败（无痕模式/浏览器禁用存储）", e);
+            console.warn("保存失败", e);
         }
     }
     // 读取本地设置
@@ -339,14 +475,13 @@
             const settingData = JSON.parse(str);
             autoStopDelay = settingData.autoStopDelay ?? 500;
             isNoRepeat = settingData.isNoRepeat ?? false;
-            isFilterStudent = settingData.isFilterStudent ?? true;
-            console.log("✅读取本地设置成功", settingData);
+            answerTotalSecond = settingData.answerTotalSecond ?? 30;
+            autoStartTimer = settingData.autoStartTimer ?? false;
+            hideTimer = settingData.hideTimer ?? true;
         }catch(e){
-            console.warn("❌读取本地设置失败", e);
+            console.warn("读取设置失败", e);
         }
     }
-
-    // 获取过滤后的学生名单
     function getAvailableStudentList(){
         if(isFilterStudent){
             return defaultStudents.filter(name => !filterNameList.includes(name));
@@ -354,14 +489,16 @@
             return [...defaultStudents];
         }
     }
-
     function init(){
         loadSettings();
-        // 渲染UI状态
         document.getElementById("durationSlider").value = autoStopDelay / 1000;
         document.getElementById("durationValue").textContent = (autoStopDelay /1000) + " 秒";
+        document.getElementById("timerSlider").value = answerTotalSecond;
+        document.getElementById("timerValue").textContent = answerTotalSecond + " 秒";
+        document.getElementById("autoStartTimerCheck").checked = autoStartTimer;
+        document.getElementById("hideTimerCheck").checked = hideTimer;
+        applyTimerVisible();
         document.getElementById("noRepeatCheck").checked = isNoRepeat;
-        document.getElementById("filterStudentCheck").checked = isFilterStudent;
         if(isNoRepeat){
             document.getElementById("clearBtn").classList.remove("hide");
         }else{
@@ -369,8 +506,23 @@
         }
         studentList = getAvailableStudentList();
         renderList();
+        resetTimer();
+        updateDrawBtnState();
     }
-
+    function applyTimerVisible(){
+        const wrap = document.getElementById("timerWrap");
+        if(hideTimer){
+            wrap.style.display="none";
+        }else{
+            wrap.style.display="block";
+        }
+    }
+    function toggleHideTimer(){
+        const check = document.getElementById("hideTimerCheck");
+        hideTimer = check.checked;
+        saveSettings();
+        applyTimerVisible();
+    }
     function renderList(){
         const box = document.getElementById('listBox');
         box.innerHTML = '';
@@ -381,12 +533,10 @@
             box.appendChild(div);
         })
     }
-
     function toggleSettings(){
         const panel = document.getElementById('settingsPanel');
         panel.classList.toggle('show');
     }
-
     function updateDuration(){
         const slider = document.getElementById('durationSlider');
         const valueEl = document.getElementById('durationValue');
@@ -395,37 +545,102 @@
         valueEl.textContent = seconds + ' 秒';
         saveSettings();
     }
-
-    function toggleFilterStudent(){
-        const check = document.getElementById("filterStudentCheck");
-        isFilterStudent = check.checked;
+    function updateTimerSetting(){
+        const slider = document.getElementById('timerSlider');
+        const valueEl = document.getElementById('timerValue');
+        answerTotalSecond = Number(slider.value);
+        valueEl.textContent = answerTotalSecond + " 秒";
         saveSettings();
-        studentList = getAvailableStudentList();
-        renderList();
+        resetTimer();
     }
-
+    function toggleAutoStartTimer(){
+        const check = document.getElementById("autoStartTimerCheck");
+        autoStartTimer = check.checked;
+        saveSettings();
+    }
     function toggleStudentList(){
         const wrap = document.getElementById('studentListWrap');
         wrap.classList.toggle('show');
         const btn = document.querySelector('.btn-toggle-list');
         btn.innerText = wrap.classList.contains('show') ? '隐藏名单' : '显示名单';
     }
-
     function toggleNoRepeat(){
         const check = document.getElementById('noRepeatCheck');
         const clearBtn = document.getElementById('clearBtn');
         isNoRepeat = check.checked;
         if(isNoRepeat){
-            clearBtn.classList.remove('hide');
+            clearBtn.classList.remove("hide");
         }else{
-            clearBtn.classList.add('hide');
+            clearBtn.classList.add("hide");
         }
         saveSettings();
+        updateDrawBtnState();
     }
-
     function clearHistory(){
         pickedSet.clear();
-        alert("已清除抽取历史记录，所有学生均可再次被抽取");
+        showModal("已清除抽取历史记录，所有学生均可再次被抽取");
+        updateDrawBtnState(); //清除记录恢复按钮可用
+    }
+
+    // --------计时相关函数--------
+    function updateTimerDisplay(){
+        const disp = document.getElementById("timerDisplay");
+        const min = Math.floor(answerLeftSecond / 60);
+        const sec = answerLeftSecond % 60;
+        disp.innerText = String(min).padStart(2,'0') + ":" + String(sec).padStart(2,'0');
+        if(answerLeftSecond <=10){
+            disp.classList.add("warn");
+        }else{
+            disp.classList.remove("warn");
+        }
+    }
+
+    function updateMainTimerBtn(){
+        const btn = document.getElementById("timerMainBtn");
+        if(timerRunning){
+            btn.innerText = "暂停";
+        }else{
+            btn.innerText = "继续计时";
+        }
+    }
+
+    //合并开始/暂停按钮
+    function toggleTimer(){
+        if(timerRunning){
+            pauseTimer();
+        }else{
+            if(answerLeftSecond <=0) answerLeftSecond = answerTotalSecond;
+            startTimerInner();
+        }
+    }
+
+    function startTimerInner(){
+        if(timerRunning) return;
+        timerRunning = true;
+        updateMainTimerBtn();
+        timerInterval = setInterval(()=>{
+            answerLeftSecond -=1;
+            updateTimerDisplay();
+            if(answerLeftSecond <=0){
+                clearInterval(timerInterval);
+                timerRunning = false;
+                updateMainTimerBtn();
+                showModal("倒计时已结束");
+            }
+        },1000);
+    }
+
+    function pauseTimer(){
+        timerRunning = false;
+        clearInterval(timerInterval);
+        updateMainTimerBtn();
+    }
+
+    function resetTimer(){
+        pauseTimer();
+        answerLeftSecond = answerTotalSecond;
+        updateTimerDisplay();
+        updateMainTimerBtn();
     }
 
     function stopDraw(){
@@ -437,12 +652,12 @@
         btn.disabled = false;
         btn.innerText = "抽取学生";
         resultDom.classList.remove("rolling");
-
         let res;
         if(isNoRepeat){
             let available = studentList.filter(name => !pickedSet.has(name));
             if(available.length === 0){
-                alert("所有学生均已抽取完毕，请清除记录后重新开始");
+                showModal("所有学生均已抽取完毕，请清除记录后重新开始");
+                updateDrawBtnState();
                 return;
             }
             const finalIdx = Math.floor(Math.random() * available.length);
@@ -452,17 +667,23 @@
             const finalIdx = Math.floor(Math.random() * studentList.length);
             res = studentList[finalIdx];
         }
-
         resultDom.textContent = res;
         resultDom.classList.add("finish");
         setTimeout(()=>{
             resultDom.classList.remove("finish");
         }, 800);
+
+        resetTimer();
+        // 只有计时器不隐藏的时候，才执行自动计时
+        if(autoStartTimer && !hideTimer){
+            startTimerInner();
+        }
+        updateDrawBtnState(); //抽选完成更新按钮状态
     }
 
     function startDraw(){
         if(studentList.length === 0){
-            alert("名单为空");
+            showModal("名单为空");
             return;
         }
         const btn = document.getElementById('drawBtn');
@@ -472,12 +693,10 @@
             btn.disabled = true;
             btn.innerText = "抽取中…";
             resultDom.classList.add("rolling");
-
             rollingTimer = setInterval(()=>{
                 const randomIdx = Math.floor(Math.random() * studentList.length);
                 resultDom.textContent = studentList[randomIdx];
             }, 80);
-
             autoStopTimer = setTimeout(()=>{
                 stopDraw();
             }, autoStopDelay);
