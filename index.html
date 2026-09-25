@@ -419,7 +419,7 @@
     let rollingTimer = null;
     let autoStopTimer = null;
     let isRolling = false;
-    let autoStopDelay = 500;
+    let autoStopDelay = 500; // 默认抽取时长：0.5秒
     // 答题计时变量
     let answerTotalSecond = 30;
     let answerLeftSecond = 0;
@@ -625,7 +625,7 @@
                 clearInterval(timerInterval);
                 timerRunning = false;
                 updateMainTimerBtn();
-                showModal("倒计时已结束");
+                showModal("计时已完成");
             }
         },1000);
     }
